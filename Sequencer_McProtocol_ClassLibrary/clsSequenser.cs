@@ -18,7 +18,7 @@ namespace Sequencer_McProtocol_ClassLibrary
         //エンコーディング形式
         private Encoding enc = Encoding.ASCII;
 
-        private string[,] StateArray = null;  
+        private string[,] StateArray = null;
 
         #endregion
 
@@ -47,7 +47,6 @@ namespace Sequencer_McProtocol_ClassLibrary
         #region クラス定義
         private ConvertDispName CNV = new ConvertDispName();
         #endregion
-
 
         #region 接続処理
         public bool Connection(string SequenceIP, int SequencePort)
@@ -101,7 +100,7 @@ namespace Sequencer_McProtocol_ClassLibrary
             //ウェイト(msec)
             System.Threading.Thread.Sleep(10);
 
-            Sequencer_Read(ref prUD, ref prLR);
+            Sequencer_Position_Read(ref prUD, ref prLR);
 
             #endregion
         }
@@ -109,7 +108,7 @@ namespace Sequencer_McProtocol_ClassLibrary
 
         #endregion
 
-
+        #region 回転台位置指定
         public void DegSet(double prUD, double prLR)
         {
             #region シーケンサー送信
@@ -117,15 +116,13 @@ namespace Sequencer_McProtocol_ClassLibrary
 
             try
             {
-
-
+                clsDefine.MOVE_FIG = true;
 
                 #region リモート指定
 
                 Sequencer_Send((int)clsDefine.ConectReadMode.REMOTE);
 
                 #endregion
-
 
 
                 #region 角度移動
@@ -213,7 +210,6 @@ namespace Sequencer_McProtocol_ClassLibrary
                 System.Threading.Thread.Sleep(10);
                 #endregion
 
-
                 #region メモリ設定(L/R)
 
                 //メモリの開始番号
@@ -299,7 +295,6 @@ namespace Sequencer_McProtocol_ClassLibrary
 
                 while (clsDefine.MOVE_FIG)
                 {
-                    //Application.DoEvents();
 
                     Sequencer_Send((int)clsDefine.ConectReadMode.State);
 
@@ -336,6 +331,59 @@ namespace Sequencer_McProtocol_ClassLibrary
 
             #endregion
         }
+        #endregion
+
+        #region リモート
+        public void Remote_Set()
+        {
+            Sequencer_Send((int)clsDefine.ConectReadMode.REMOTE);
+        }
+        #endregion
+
+        #region ローカル
+        public void Local_Set()
+        {
+            Sequencer_Send((int)clsDefine.ConectReadMode.LOCAL);
+        }
+        #endregion
+
+        #region 非常停止
+        public void Emergency_Stop()
+        {
+            Sequencer_Send((int)clsDefine.ConectReadMode.Stop);
+        }
+        #endregion
+
+        #region 警告リセット
+        public void Alarm_Reset()
+        {
+            Sequencer_Send((int)clsDefine.ConectReadMode.ErrResetOn);
+            //ウェイト(msec)
+            System.Threading.Thread.Sleep(10);
+            Sequencer_Send((int)clsDefine.ConectReadMode.AllReset);
+        }
+        #endregion
+
+        #region ブザー停止
+        public void Beep_Off()
+        {
+            Sequencer_Send((int)clsDefine.ConectReadMode.BepOff);
+            //ウェイト(msec)
+            System.Threading.Thread.Sleep(10);
+            Sequencer_Send((int)clsDefine.ConectReadMode.AllReset);
+        }
+        #endregion
+
+        #region U/D　L/R　ホームポジション読取(DM1010～1029)
+        public void Read_HomePosition(ref string[] strLimit_Array)
+        {
+            Sequencer_Send((int)clsDefine.ConectReadMode.OffSet);
+            //ウェイト(msec)
+            System.Threading.Thread.Sleep(10);
+            Sequencer_Home_Read(ref strLimit_Array);
+        }
+
+        #endregion
 
         #region 原点復帰
         public void ORG()
@@ -354,7 +402,6 @@ namespace Sequencer_McProtocol_ClassLibrary
         }
 
         #endregion
-
 
         #region バイト列を16進数表記の文字列に変換
         private static string BytesToHexString(byte[] bytes, int GetLength)
@@ -471,7 +518,6 @@ namespace Sequencer_McProtocol_ClassLibrary
         }
         #endregion
 
-
         #region シーケンサーコマンド送信
         public void Sequencer_Send(int Mode)
         {
@@ -507,7 +553,120 @@ namespace Sequencer_McProtocol_ClassLibrary
         #endregion
 
         #region シーケンサーコマンド受信
-        private void Sequencer_State_Read(ref string[,] retState)
+        private void Sequencer_Home_Read(ref string[] RET_LIMIT_STATE)
+        {
+            #region 受信処理
+
+            RET_LIMIT_STATE = new string[6];
+             
+            string strReceivedData = string.Empty;
+            string ArrayData = string.Empty;
+
+            //リモートホストからの返信を受信します。
+            do
+            {
+                if (stream.DataAvailable)
+                {
+                    byte[] bytReceiveBuffer = new byte[255];
+                    int intDataLength = stream.Read(bytReceiveBuffer, 0, bytReceiveBuffer.Length);
+                    strReceivedData = BytesToHexString(bytReceiveBuffer, intDataLength);
+                    ArrayData += strReceivedData;
+                }
+                else if (strReceivedData != null)
+                {
+                    break;
+                }
+            } while (true);
+
+            if (ArrayData.Length > 10)
+            {
+
+                //文字列分解
+                string GetRecValue = ArrayData.Substring(22, ArrayData.Length - 22);
+
+
+                if (GetRecValue.Length > 10)
+                {
+                    int jj = 0;
+                    int num = 0;
+                    int BitIndex = 4;
+                    int[] BitGetLength = new int[] { 2, 2 };
+                    int[] DispDecimal = new int[] { 100, 100 };
+                    //16進数を10進数変換　バイナリ上位下位の入替
+                    //48bit(QWORD)6バイト
+                    string[] QWORD_Array = new string[GetRecValue.Length / BitIndex];
+                    decimal[] DispValue = new decimal[2];
+
+                    for (int ii = 0; ii < GetRecValue.Length / BitIndex; ii++)
+                    {
+
+                        QWORD_Array[ii] = GetRecValue.Substring(jj * BitIndex, BitIndex);
+                        jj++;
+
+                        if (QWORD_Array[ii].Length == BitIndex)
+                        {
+                            int StrLength = 0;
+
+                            //文字列を2つに分解
+                            string[] M_DATA = new string[2];
+                            for (int kk = 0; kk < 2; kk++)
+                            {
+                                M_DATA[kk] = ConvMCFormat(QWORD_Array[ii].Substring(StrLength, BitGetLength[kk]), true);
+                                StrLength += BitGetLength[kk];
+                            }
+
+                            // Convertクラスを利用
+                            num = Convert.ToInt32(M_DATA[1] + M_DATA[0], 16);
+
+                            string hexStr = M_DATA[1] + M_DATA[0];
+
+                            string Bittext = Validation.Val(Convert.ToString(Convert.ToInt32(hexStr, 16), 2)).ToString("0000000000000000");
+
+                            if (Bittext.Substring(0, 1) == "1")
+                            {
+                                num -= 65536;
+                            }
+
+                            string txtFormat = "##0.00";
+
+                            switch (ii)
+                            {
+                                case (int)LIMIT_STATE.UDHOME:
+                                    //U/D
+                                    RET_LIMIT_STATE[0] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                    break;
+                                case (int)LIMIT_STATE.UDSLimit_P:
+                                    //U/D
+                                    RET_LIMIT_STATE[1] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                    break;
+                                case (int)LIMIT_STATE.UDSLimit_M:
+                                    //U/D
+                                    RET_LIMIT_STATE[2] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                    break;
+                                case (int)LIMIT_STATE.LRHOME:
+                                    //L/R
+                                    RET_LIMIT_STATE[3] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                    break;
+
+                                case (int)LIMIT_STATE.LRSLimit_M:
+                                    //L/R
+                                    RET_LIMIT_STATE[4] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                    break;
+
+                                case (int)LIMIT_STATE.LRSLimit_P:
+                                    //L/R
+                                    RET_LIMIT_STATE[5] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                    break;
+                            }
+
+                        }
+                    }
+
+                }
+            }
+            #endregion
+        }
+        private  void  Sequencer_State_Read(ref string[,] retState)
         {
             #region 受信処理
 
@@ -584,7 +743,6 @@ namespace Sequencer_McProtocol_ClassLibrary
                             {
                                 num -= 65536;
                             }
-
 
 
                             // stTarget を Char 型の 1 次元配列に変換する
@@ -742,7 +900,7 @@ namespace Sequencer_McProtocol_ClassLibrary
                 }
             }
         }
-        private void Sequencer_Read(ref double retUD, ref double retLR)
+        private void Sequencer_Position_Read(ref double retUD, ref double retLR)
         {
             #region 受信処理
 
