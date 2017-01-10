@@ -91,25 +91,37 @@ namespace Sequencer_McProtocol_ClassLibrary
         #endregion
 
         #region 回転台位置読取
-        public void DgrGet(ref double prUD, ref double prLR)
+        public bool DgrGet(ref double prUD, ref double prLR)
         {
-            #region U/D座標 L/R座標読取(DM2012～2034)
+            bool Ret = true;
 
-            Sequencer_Send((int)clsDefine.ConectReadMode.TurnRead);
+            try
+            {
 
-            //ウェイト(msec)
-            System.Threading.Thread.Sleep(10);
+                #region U/D座標 L/R座標読取(DM2012～2034)
 
-            Sequencer_Position_Read(ref prUD, ref prLR);
+                Ret = Sequencer_Send((int)clsDefine.ConectReadMode.TurnRead);
 
-            #endregion
+                //ウェイト(msec)
+                System.Threading.Thread.Sleep(10);
+
+                Ret = Sequencer_Position_Read(ref prUD, ref prLR);
+
+                #endregion
+
+                return Ret;
+            }
+            catch
+            { return false; }
+            finally
+            { GC.Collect(); }
         }
 
 
         #endregion
 
         #region 回転台位置指定
-        public void DegSet(double prUD, double prLR)
+        public bool DegSet(double prUD, double prLR)
         {
             #region シーケンサー送信
 
@@ -319,14 +331,17 @@ namespace Sequencer_McProtocol_ClassLibrary
 
                 #endregion
 
+
+                return true; 
+
             }
             catch (Exception ex)
             {
-
+                return false; 
             }
             finally
             {
-
+                GC.Collect();
             }
 
             #endregion
@@ -334,43 +349,51 @@ namespace Sequencer_McProtocol_ClassLibrary
         #endregion
 
         #region リモート
-        public void Remote_Set()
+        public bool Remote_Set()
         {
-            Sequencer_Send((int)clsDefine.ConectReadMode.REMOTE);
+            return Sequencer_Send((int)clsDefine.ConectReadMode.REMOTE);
         }
         #endregion
 
         #region ローカル
-        public void Local_Set()
+        public bool Local_Set()
         {
-            Sequencer_Send((int)clsDefine.ConectReadMode.LOCAL);
+            return Sequencer_Send((int)clsDefine.ConectReadMode.LOCAL);
         }
         #endregion
 
         #region 非常停止
-        public void Emergency_Stop()
+        public bool Emergency_Stop()
         {
-            Sequencer_Send((int)clsDefine.ConectReadMode.Stop);
+            return  Sequencer_Send((int)clsDefine.ConectReadMode.Stop);
         }
         #endregion
 
         #region 警告リセット
-        public void Alarm_Reset()
+        public bool Alarm_Reset()
         {
-            Sequencer_Send((int)clsDefine.ConectReadMode.ErrResetOn);
+            bool Ret = true;
+
+            Ret = Sequencer_Send((int)clsDefine.ConectReadMode.ErrResetOn);
             //ウェイト(msec)
             System.Threading.Thread.Sleep(10);
-            Sequencer_Send((int)clsDefine.ConectReadMode.AllReset);
+            Ret = Sequencer_Send((int)clsDefine.ConectReadMode.AllReset);
+
+            return Ret;
         }
         #endregion
 
         #region ブザー停止
-        public void Beep_Off()
+        public bool Beep_Off()
         {
-            Sequencer_Send((int)clsDefine.ConectReadMode.BepOff);
+            bool Ret = true;
+
+            Ret = Sequencer_Send((int)clsDefine.ConectReadMode.BepOff);
             //ウェイト(msec)
             System.Threading.Thread.Sleep(10);
-            Sequencer_Send((int)clsDefine.ConectReadMode.AllReset);
+            Ret = Sequencer_Send((int)clsDefine.ConectReadMode.AllReset);
+
+            return Ret;
         }
         #endregion
 
@@ -386,19 +409,22 @@ namespace Sequencer_McProtocol_ClassLibrary
         #endregion
 
         #region 原点復帰
-        public void ORG()
+        public bool ORG()
         {
+            bool Ret = true;
 
             #region リモート指定
 
-            Sequencer_Send((int)clsDefine.ConectReadMode.REMOTE);
+            Ret = Sequencer_Send((int)clsDefine.ConectReadMode.REMOTE);
 
             #endregion
 
             //ウェイト(msec)
             System.Threading.Thread.Sleep(10);
 
-            Sequencer_Send((int)clsDefine.ConectReadMode.ORG);
+            Ret = Sequencer_Send((int)clsDefine.ConectReadMode.ORG);
+
+            return Ret; 
         }
 
         #endregion
@@ -519,480 +545,521 @@ namespace Sequencer_McProtocol_ClassLibrary
         #endregion
 
         #region シーケンサーコマンド送信
-        public void Sequencer_Send(int Mode)
+        public bool Sequencer_Send(int Mode)
         {
-
-            //--------------
-            // サーバーへ送信
-            #region コマンド送信
-
-            string SendCommnd = clsDefine.SendCmmand[Mode];
-
-            //16進数文字列を2文字づつ区切って数値配列に設定する
-            int SendLength = SendCommnd.Length / 2;
-
-            char[] Sendchar = new char[1024];
-            byte[] SendBuffer = new byte[1024];
-            int[] IntArray = new int[1024];
-            int jj = 0;
-
-            for (int ii = 0; ii < SendCommnd.Length; ii += 2)
+            try
             {
-                if (SendCommnd.Length > ii + 2)
+
+                //--------------
+                // サーバーへ送信
+                #region コマンド送信
+
+                string SendCommnd = clsDefine.SendCmmand[Mode];
+
+                //16進数文字列を2文字づつ区切って数値配列に設定する
+                int SendLength = SendCommnd.Length / 2;
+
+                char[] Sendchar = new char[1024];
+                byte[] SendBuffer = new byte[1024];
+                int[] IntArray = new int[1024];
+                int jj = 0;
+
+                for (int ii = 0; ii < SendCommnd.Length; ii += 2)
                 {
-                    IntArray[jj] = Convert.ToInt32(SendCommnd.Substring(ii, 2), 16);
-                    SendBuffer[jj] = (byte)IntArray[jj];
-                    jj++;
+                    if (SendCommnd.Length > ii + 2)
+                    {
+                        IntArray[jj] = Convert.ToInt32(SendCommnd.Substring(ii, 2), 16);
+                        SendBuffer[jj] = (byte)IntArray[jj];
+                        jj++;
+                    }
                 }
+                stream.Write(SendBuffer, 0, SendBuffer.Length);
+                stream.Flush(); // フラッシュ(強制書き出し)
+                return true; 
+
             }
-            stream.Write(SendBuffer, 0, SendBuffer.Length);
-            stream.Flush(); // フラッシュ(強制書き出し)
+            catch
+            {
+                return false; 
+            }
+            finally
+            { GC.Collect(); } 
 
             #endregion
         }
         #endregion
 
         #region シーケンサーコマンド受信
-        private void Sequencer_Home_Read(ref string[] RET_LIMIT_STATE)
+        private bool Sequencer_Home_Read(ref string[] RET_LIMIT_STATE)
         {
-            #region 受信処理
-
-            RET_LIMIT_STATE = new string[6];
-             
-            string strReceivedData = string.Empty;
-            string ArrayData = string.Empty;
-
-            //リモートホストからの返信を受信します。
-            do
-            {
-                if (stream.DataAvailable)
-                {
-                    byte[] bytReceiveBuffer = new byte[255];
-                    int intDataLength = stream.Read(bytReceiveBuffer, 0, bytReceiveBuffer.Length);
-                    strReceivedData = BytesToHexString(bytReceiveBuffer, intDataLength);
-                    ArrayData += strReceivedData;
-                }
-                else if (strReceivedData != null)
-                {
-                    break;
-                }
-            } while (true);
-
-            if (ArrayData.Length > 10)
+            try
             {
 
-                //文字列分解
-                string GetRecValue = ArrayData.Substring(22, ArrayData.Length - 22);
+                #region 受信処理
 
+                RET_LIMIT_STATE = new string[6];
 
-                if (GetRecValue.Length > 10)
+                string strReceivedData = string.Empty;
+                string ArrayData = string.Empty;
+
+                //リモートホストからの返信を受信します。
+                do
                 {
-                    int jj = 0;
-                    int num = 0;
-                    int BitIndex = 4;
-                    int[] BitGetLength = new int[] { 2, 2 };
-                    int[] DispDecimal = new int[] { 100, 100 };
-                    //16進数を10進数変換　バイナリ上位下位の入替
-                    //48bit(QWORD)6バイト
-                    string[] QWORD_Array = new string[GetRecValue.Length / BitIndex];
-                    decimal[] DispValue = new decimal[2];
-
-                    for (int ii = 0; ii < GetRecValue.Length / BitIndex; ii++)
+                    if (stream.DataAvailable)
                     {
-
-                        QWORD_Array[ii] = GetRecValue.Substring(jj * BitIndex, BitIndex);
-                        jj++;
-
-                        if (QWORD_Array[ii].Length == BitIndex)
-                        {
-                            int StrLength = 0;
-
-                            //文字列を2つに分解
-                            string[] M_DATA = new string[2];
-                            for (int kk = 0; kk < 2; kk++)
-                            {
-                                M_DATA[kk] = ConvMCFormat(QWORD_Array[ii].Substring(StrLength, BitGetLength[kk]), true);
-                                StrLength += BitGetLength[kk];
-                            }
-
-                            // Convertクラスを利用
-                            num = Convert.ToInt32(M_DATA[1] + M_DATA[0], 16);
-
-                            string hexStr = M_DATA[1] + M_DATA[0];
-
-                            string Bittext = Validation.Val(Convert.ToString(Convert.ToInt32(hexStr, 16), 2)).ToString("0000000000000000");
-
-                            if (Bittext.Substring(0, 1) == "1")
-                            {
-                                num -= 65536;
-                            }
-
-                            string txtFormat = "##0.00";
-
-                            switch (ii)
-                            {
-                                case (int)LIMIT_STATE.UDHOME:
-                                    //U/D
-                                    RET_LIMIT_STATE[0] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
-                                    break;
-                                case (int)LIMIT_STATE.UDSLimit_P:
-                                    //U/D
-                                    RET_LIMIT_STATE[1] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
-                                    break;
-                                case (int)LIMIT_STATE.UDSLimit_M:
-                                    //U/D
-                                    RET_LIMIT_STATE[2] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
-                                    break;
-                                case (int)LIMIT_STATE.LRHOME:
-                                    //L/R
-                                    RET_LIMIT_STATE[3] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
-                                    break;
-
-                                case (int)LIMIT_STATE.LRSLimit_M:
-                                    //L/R
-                                    RET_LIMIT_STATE[4] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
-                                    break;
-
-                                case (int)LIMIT_STATE.LRSLimit_P:
-                                    //L/R
-                                    RET_LIMIT_STATE[5] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
-                                    break;
-                            }
-
-                        }
+                        byte[] bytReceiveBuffer = new byte[255];
+                        int intDataLength = stream.Read(bytReceiveBuffer, 0, bytReceiveBuffer.Length);
+                        strReceivedData = BytesToHexString(bytReceiveBuffer, intDataLength);
+                        ArrayData += strReceivedData;
                     }
-
-                }
-            }
-            #endregion
-        }
-        private  void  Sequencer_State_Read(ref string[,] retState)
-        {
-            #region 受信処理
-
-            string strReceivedData = string.Empty;
-            string ArrayData = string.Empty;
-
-            retState = new string[3, 20];
-
-            //リモートホストからの返信を受信します。
-            do
-            {
-                if (stream.DataAvailable)
-                {
-                    byte[] bytReceiveBuffer = new byte[255];
-                    int intDataLength = stream.Read(bytReceiveBuffer, 0, bytReceiveBuffer.Length);
-                    strReceivedData = BytesToHexString(bytReceiveBuffer, intDataLength);
-                    ArrayData += strReceivedData;
-                }
-                else if (strReceivedData != null)
-                {
-                    break;
-                }
-            } while (true);
-
-            if (ArrayData.Length > 10)
-            {
-
-                //文字列分解
-                string GetRecValue = ArrayData.Substring(22, ArrayData.Length - 22);
-
-
-                if (GetRecValue.Length > 10)
-                {
-                    int jj = 0;
-                    int BitCnt = 0;
-                    int num = 0;
-                    int BitIndex = 4;
-                    int GridIndex = 0;
-                    int[] BitGetLength = new int[] { 2, 2 };
-                    int[] DispDecimal = new int[] { 100, 100 };
-                    //16進数を10進数変換　バイナリ上位下位の入替
-                    //48bit(QWORD)6バイト
-                    string[] QWORD_Array = new string[GetRecValue.Length / BitIndex];
-                    decimal[] DispValue = new decimal[2];
-
-
-                    for (int ii = 0; ii < GetRecValue.Length / BitIndex; ii++)
+                    else if (strReceivedData != null)
                     {
+                        break;
+                    }
+                } while (true);
 
-                        QWORD_Array[ii] = GetRecValue.Substring(jj * BitIndex, BitIndex);
-                        jj++;
+                if (ArrayData.Length > 10)
+                {
 
-                        if (QWORD_Array[ii].Length == BitIndex)
+                    //文字列分解
+                    string GetRecValue = ArrayData.Substring(22, ArrayData.Length - 22);
+
+
+                    if (GetRecValue.Length > 10)
+                    {
+                        int jj = 0;
+                        int num = 0;
+                        int BitIndex = 4;
+                        int[] BitGetLength = new int[] { 2, 2 };
+                        int[] DispDecimal = new int[] { 100, 100 };
+                        //16進数を10進数変換　バイナリ上位下位の入替
+                        //48bit(QWORD)6バイト
+                        string[] QWORD_Array = new string[GetRecValue.Length / BitIndex];
+                        decimal[] DispValue = new decimal[2];
+
+                        for (int ii = 0; ii < GetRecValue.Length / BitIndex; ii++)
                         {
-                            int StrLength = 0;
 
-                            //文字列を2つに分解
-                            string[] M_DATA = new string[2];
-                            for (int kk = 0; kk < 2; kk++)
+                            QWORD_Array[ii] = GetRecValue.Substring(jj * BitIndex, BitIndex);
+                            jj++;
+
+                            if (QWORD_Array[ii].Length == BitIndex)
                             {
-                                M_DATA[kk] = ConvMCFormat(QWORD_Array[ii].Substring(StrLength, BitGetLength[kk]), true);
-                                StrLength += BitGetLength[kk];
+                                int StrLength = 0;
+
+                                //文字列を2つに分解
+                                string[] M_DATA = new string[2];
+                                for (int kk = 0; kk < 2; kk++)
+                                {
+                                    M_DATA[kk] = ConvMCFormat(QWORD_Array[ii].Substring(StrLength, BitGetLength[kk]), true);
+                                    StrLength += BitGetLength[kk];
+                                }
+
+                                // Convertクラスを利用
+                                num = Convert.ToInt32(M_DATA[1] + M_DATA[0], 16);
+
+                                string hexStr = M_DATA[1] + M_DATA[0];
+
+                                string Bittext = Validation.Val(Convert.ToString(Convert.ToInt32(hexStr, 16), 2)).ToString("0000000000000000");
+
+                                if (Bittext.Substring(0, 1) == "1")
+                                {
+                                    num -= 65536;
+                                }
+
+                                string txtFormat = "##0.00";
+
+                                switch (ii)
+                                {
+                                    case (int)LIMIT_STATE.UDHOME:
+                                        //U/D
+                                        RET_LIMIT_STATE[0] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                        break;
+                                    case (int)LIMIT_STATE.UDSLimit_P:
+                                        //U/D
+                                        RET_LIMIT_STATE[1] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                        break;
+                                    case (int)LIMIT_STATE.UDSLimit_M:
+                                        //U/D
+                                        RET_LIMIT_STATE[2] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                        break;
+                                    case (int)LIMIT_STATE.LRHOME:
+                                        //L/R
+                                        RET_LIMIT_STATE[3] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                        break;
+
+                                    case (int)LIMIT_STATE.LRSLimit_M:
+                                        //L/R
+                                        RET_LIMIT_STATE[4] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                        break;
+
+                                    case (int)LIMIT_STATE.LRSLimit_P:
+                                        //L/R
+                                        RET_LIMIT_STATE[5] = ((decimal)num / DispDecimal[0]).ToString(txtFormat);
+                                        break;
+                                }
+
                             }
+                        }
+
+                    }
+                }
+                return true;
+                #endregion
+            }
+            catch
+            { return false; }
+            finally
+            { GC.Collect();}
+        }
+        private bool Sequencer_State_Read(ref string[,] retState)
+        {
+
+            try
+            {
+                #region 受信処理
+
+                string strReceivedData = string.Empty;
+                string ArrayData = string.Empty;
+
+                retState = new string[3, 20];
+
+                //リモートホストからの返信を受信します。
+                do
+                {
+                    if (stream.DataAvailable)
+                    {
+                        byte[] bytReceiveBuffer = new byte[255];
+                        int intDataLength = stream.Read(bytReceiveBuffer, 0, bytReceiveBuffer.Length);
+                        strReceivedData = BytesToHexString(bytReceiveBuffer, intDataLength);
+                        ArrayData += strReceivedData;
+                    }
+                    else if (strReceivedData != null)
+                    {
+                        break;
+                    }
+                } while (true);
+
+                if (ArrayData.Length > 10)
+                {
+
+                    //文字列分解
+                    string GetRecValue = ArrayData.Substring(22, ArrayData.Length - 22);
 
 
-                            // Convertクラスを利用
-                            num = Convert.ToInt32(M_DATA[1] + M_DATA[0], 16);
+                    if (GetRecValue.Length > 10)
+                    {
+                        int jj = 0;
+                        int BitCnt = 0;
+                        int num = 0;
+                        int BitIndex = 4;
+                        int GridIndex = 0;
+                        int[] BitGetLength = new int[] { 2, 2 };
+                        int[] DispDecimal = new int[] { 100, 100 };
+                        //16進数を10進数変換　バイナリ上位下位の入替
+                        //48bit(QWORD)6バイト
+                        string[] QWORD_Array = new string[GetRecValue.Length / BitIndex];
+                        decimal[] DispValue = new decimal[2];
 
-                            string hexStr = M_DATA[1] + M_DATA[0];
 
-                            string Bittext = Validation.Val(Convert.ToString(Convert.ToInt32(hexStr, 16), 2)).ToString("0000000000000000");
+                        for (int ii = 0; ii < GetRecValue.Length / BitIndex; ii++)
+                        {
 
-                            if (Bittext.Substring(0, 1) == "1")
+                            QWORD_Array[ii] = GetRecValue.Substring(jj * BitIndex, BitIndex);
+                            jj++;
+
+                            if (QWORD_Array[ii].Length == BitIndex)
                             {
-                                num -= 65536;
-                            }
+                                int StrLength = 0;
+
+                                //文字列を2つに分解
+                                string[] M_DATA = new string[2];
+                                for (int kk = 0; kk < 2; kk++)
+                                {
+                                    M_DATA[kk] = ConvMCFormat(QWORD_Array[ii].Substring(StrLength, BitGetLength[kk]), true);
+                                    StrLength += BitGetLength[kk];
+                                }
 
 
-                            // stTarget を Char 型の 1 次元配列に変換する
-                            char[] chArray = Bittext.ToCharArray();
+                                // Convertクラスを利用
+                                num = Convert.ToInt32(M_DATA[1] + M_DATA[0], 16);
 
-                            switch (ii)
-                            {
-                                case (int)STATE_DM.DM30:
+                                string hexStr = M_DATA[1] + M_DATA[0];
 
-                                    BitCnt = 0;
-                                    for (int kk = chArray.Length - 1; kk > -1; kk--)
-                                    {
-                                        if (BitCnt != 3 && BitCnt != 5)
+                                string Bittext = Validation.Val(Convert.ToString(Convert.ToInt32(hexStr, 16), 2)).ToString("0000000000000000");
+
+                                if (Bittext.Substring(0, 1) == "1")
+                                {
+                                    num -= 65536;
+                                }
+
+
+                                // stTarget を Char 型の 1 次元配列に変換する
+                                char[] chArray = Bittext.ToCharArray();
+
+                                switch (ii)
+                                {
+                                    case (int)STATE_DM.DM30:
+
+                                        BitCnt = 0;
+                                        for (int kk = chArray.Length - 1; kk > -1; kk--)
                                         {
-                                            retState[0, GridIndex] = "DM30";
-                                            retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                            retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:警報" : "OFF:正常";
-                                            GridIndex++;
-                                        }
-                                        BitCnt++;
-                                    }
-                                    break;
-
-
-                                case (int)STATE_DM.DM31:
-
-
-                                    BitCnt = 0;
-                                    for (int kk = chArray.Length - 1; kk > -1; kk--)
-                                    {
-                                        if (BitCnt < 2)
-                                        {
-                                            retState[0, GridIndex] = "DM31";
-                                            retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                            retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:警報" : "OFF:正常";
-                                            GridIndex++;
-                                        }
-                                        BitCnt++;
-                                    }
-                                    break;
-
-
-                                case (int)STATE_DM.DM32:
-
-
-                                    BitCnt = 0;
-                                    for (int kk = chArray.Length - 1; kk > -1; kk--)
-                                    {
-
-                                        switch (BitCnt)
-                                        {
-                                            case 0:
-
-                                                retState[0, GridIndex] = "DM32";
+                                            if (BitCnt != 3 && BitCnt != 5)
+                                            {
+                                                retState[0, GridIndex] = "DM30";
                                                 retState[1, GridIndex] = "bit" + BitCnt.ToString();
                                                 retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:警報" : "OFF:正常";
                                                 GridIndex++;
-                                                break;
-
-                                            case 1:
-
-                                                retState[0, GridIndex] = "DM32";
-                                                retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:ローカル" : "OFF:リモート";
-                                                GridIndex++;
-                                                break;
-
-                                            case 2:
-
-                                                retState[0, GridIndex] = "DM32";
-                                                retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:正常" : "OFF:非常停止";
-                                                GridIndex++;
-                                                break;
-
-                                            case 7://動作中フラグ取得
-
-                                                clsDefine.MOVE_FIG = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? false : true;
-                                                retState[0, GridIndex] = "DM32";
-                                                retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:停止中" : "OFF:動作中";
-                                                GridIndex++;
-                                                break;
-
-                                            case 3:
-                                            case 4:
-                                            case 5:
-                                            case 6:
-                                            case 8:
-                                            case 9:
-                                            case 10:
-                                            case 11:
-                                            case 12:
-                                            case 13:
-                                            case 14:
-                                            case 15:
-
-                                                retState[0, GridIndex] = "DM32";
-                                                retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:正常" : "OFF:異常";
-                                                GridIndex++;
-                                                break;
-
+                                            }
+                                            BitCnt++;
                                         }
-                                        BitCnt++;
-                                    }
-                                    break;
-
-                                case (int)STATE_DM.DM33:
+                                        break;
 
 
-                                    BitCnt = 0;
-                                    for (int kk = chArray.Length - 1; kk > -1; kk--)
-                                    {
+                                    case (int)STATE_DM.DM31:
 
-                                        switch (BitCnt)
+
+                                        BitCnt = 0;
+                                        for (int kk = chArray.Length - 1; kk > -1; kk--)
                                         {
-                                            case 0:
-                                                retState[0, GridIndex] = "DM33";
+                                            if (BitCnt < 2)
+                                            {
+                                                retState[0, GridIndex] = "DM31";
                                                 retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:実行中" : "OFF:停止";
+                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:警報" : "OFF:正常";
                                                 GridIndex++;
-                                                break;
-
-                                            case 1:
-                                                retState[0, GridIndex] = "DM33";
-                                                retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:実施済" : "OFF:未実施";
-                                                GridIndex++;
-                                                break;
-
-                                            case 2:
-                                            case 4:
-                                                retState[0, GridIndex] = "DM33";
-                                                retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:正常" : "OFF:停止中";
-                                                GridIndex++;
-                                                break;
-
-                                            case 3:
-                                                retState[0, GridIndex] = "DM33";
-                                                retState[1, GridIndex] = "bit" + BitCnt.ToString();
-                                                retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:完了" : "OFF:未完了";
-                                                GridIndex++;
-                                                break;
-
+                                            }
+                                            BitCnt++;
                                         }
-                                        BitCnt++;
-                                    }
-                                    break;
+                                        break;
+
+
+                                    case (int)STATE_DM.DM32:
+
+
+                                        BitCnt = 0;
+                                        for (int kk = chArray.Length - 1; kk > -1; kk--)
+                                        {
+
+                                            switch (BitCnt)
+                                            {
+                                                case 0:
+
+                                                    retState[0, GridIndex] = "DM32";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:警報" : "OFF:正常";
+                                                    GridIndex++;
+                                                    break;
+
+                                                case 1:
+
+                                                    retState[0, GridIndex] = "DM32";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:ローカル" : "OFF:リモート";
+                                                    GridIndex++;
+                                                    break;
+
+                                                case 2:
+
+                                                    retState[0, GridIndex] = "DM32";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:正常" : "OFF:非常停止";
+                                                    GridIndex++;
+                                                    break;
+
+                                                case 7://動作中フラグ取得
+
+                                                    clsDefine.MOVE_FIG = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? false : true;
+                                                    retState[0, GridIndex] = "DM32";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:停止中" : "OFF:動作中";
+                                                    GridIndex++;
+                                                    break;
+
+                                                case 3:
+                                                case 4:
+                                                case 5:
+                                                case 6:
+                                                case 8:
+                                                case 9:
+                                                case 10:
+                                                case 11:
+                                                case 12:
+                                                case 13:
+                                                case 14:
+                                                case 15:
+
+                                                    retState[0, GridIndex] = "DM32";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:正常" : "OFF:異常";
+                                                    GridIndex++;
+                                                    break;
+
+                                            }
+                                            BitCnt++;
+                                        }
+                                        break;
+
+                                    case (int)STATE_DM.DM33:
+
+
+                                        BitCnt = 0;
+                                        for (int kk = chArray.Length - 1; kk > -1; kk--)
+                                        {
+
+                                            switch (BitCnt)
+                                            {
+                                                case 0:
+                                                    retState[0, GridIndex] = "DM33";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:実行中" : "OFF:停止";
+                                                    GridIndex++;
+                                                    break;
+
+                                                case 1:
+                                                    retState[0, GridIndex] = "DM33";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:実施済" : "OFF:未実施";
+                                                    GridIndex++;
+                                                    break;
+
+                                                case 2:
+                                                case 4:
+                                                    retState[0, GridIndex] = "DM33";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:正常" : "OFF:停止中";
+                                                    GridIndex++;
+                                                    break;
+
+                                                case 3:
+                                                    retState[0, GridIndex] = "DM33";
+                                                    retState[1, GridIndex] = "bit" + BitCnt.ToString();
+                                                    retState[2, GridIndex] = (int)Validation.Val(chArray[kk]) == (int)BIT_SET.ON ? "ON:完了" : "OFF:未完了";
+                                                    GridIndex++;
+                                                    break;
+
+                                            }
+                                            BitCnt++;
+                                        }
+                                        break;
+                                }
                             }
                         }
                     }
-                    #endregion
                 }
+                return true;
+                #endregion
             }
+            catch
+            {
+                return false; 
+            }
+            finally
+            { GC.Collect(); }
         }
-        private void Sequencer_Position_Read(ref double retUD, ref double retLR)
+        private bool Sequencer_Position_Read(ref double retUD, ref double retLR)
         {
-            #region 受信処理
-
-            string strReceivedData = string.Empty;
-            string ArrayData = string.Empty;
-
-            //リモートホストからの返信を受信します。
-            do
-            {
-                if (stream.DataAvailable)
-                {
-                    byte[] bytReceiveBuffer = new byte[255];
-                    int intDataLength = stream.Read(bytReceiveBuffer, 0, bytReceiveBuffer.Length);
-                    strReceivedData = BytesToHexString(bytReceiveBuffer, intDataLength);
-                    ArrayData += strReceivedData;
-                }
-                else if (strReceivedData != null)
-                {
-                    break;
-                }
-            } while (true);
-
-            if (ArrayData.Length > 10)
+            try
             {
 
-                //文字列分解
-                string GetRecValue = ArrayData.Substring(22, ArrayData.Length - 22);
+                #region 受信処理
 
+                string strReceivedData = string.Empty;
+                string ArrayData = string.Empty;
 
-                if (GetRecValue.Length > 10)
+                //リモートホストからの返信を受信します。
+                do
                 {
-                    int jj = 0;
-                    int num = 0;
-                    int BitIndex = 4;
-                    int[] BitGetLength = new int[] { 2, 2 };
-                    int[] DispDecimal = new int[] { 100, 100 };
-                    //16進数を10進数変換　バイナリ上位下位の入替
-                    //48bit(QWORD)6バイト
-                    string[] QWORD_Array = new string[GetRecValue.Length / BitIndex];
-                    decimal[] DispValue = new decimal[2];
-
-
-                    for (int ii = 0; ii < GetRecValue.Length / BitIndex; ii++)
+                    if (stream.DataAvailable)
                     {
+                        byte[] bytReceiveBuffer = new byte[255];
+                        int intDataLength = stream.Read(bytReceiveBuffer, 0, bytReceiveBuffer.Length);
+                        strReceivedData = BytesToHexString(bytReceiveBuffer, intDataLength);
+                        ArrayData += strReceivedData;
+                    }
+                    else if (strReceivedData != null)
+                    {
+                        break;
+                    }
+                } while (true);
 
-                        QWORD_Array[ii] = GetRecValue.Substring(jj * BitIndex, BitIndex);
-                        jj++;
+                if (ArrayData.Length > 10)
+                {
 
-                        if (QWORD_Array[ii].Length == BitIndex)
+                    //文字列分解
+                    string GetRecValue = ArrayData.Substring(22, ArrayData.Length - 22);
+
+
+                    if (GetRecValue.Length > 10)
+                    {
+                        int jj = 0;
+                        int num = 0;
+                        int BitIndex = 4;
+                        int[] BitGetLength = new int[] { 2, 2 };
+                        int[] DispDecimal = new int[] { 100, 100 };
+                        //16進数を10進数変換　バイナリ上位下位の入替
+                        //48bit(QWORD)6バイト
+                        string[] QWORD_Array = new string[GetRecValue.Length / BitIndex];
+                        decimal[] DispValue = new decimal[2];
+
+
+                        for (int ii = 0; ii < GetRecValue.Length / BitIndex; ii++)
                         {
-                            int StrLength = 0;
 
-                            //文字列を2つに分解
-                            string[] M_DATA = new string[2];
-                            for (int kk = 0; kk < 2; kk++)
+                            QWORD_Array[ii] = GetRecValue.Substring(jj * BitIndex, BitIndex);
+                            jj++;
+
+                            if (QWORD_Array[ii].Length == BitIndex)
                             {
-                                M_DATA[kk] = ConvMCFormat(QWORD_Array[ii].Substring(StrLength, BitGetLength[kk]), true);
-                                StrLength += BitGetLength[kk];
-                            }
+                                int StrLength = 0;
+
+                                //文字列を2つに分解
+                                string[] M_DATA = new string[2];
+                                for (int kk = 0; kk < 2; kk++)
+                                {
+                                    M_DATA[kk] = ConvMCFormat(QWORD_Array[ii].Substring(StrLength, BitGetLength[kk]), true);
+                                    StrLength += BitGetLength[kk];
+                                }
 
 
-                            // Convertクラスを利用
-                            num = Convert.ToInt32(M_DATA[1] + M_DATA[0], 16);
+                                // Convertクラスを利用
+                                num = Convert.ToInt32(M_DATA[1] + M_DATA[0], 16);
 
-                            string hexStr = M_DATA[1] + M_DATA[0];
+                                string hexStr = M_DATA[1] + M_DATA[0];
 
-                            string Bittext = Validation.Val(Convert.ToString(Convert.ToInt32(hexStr, 16), 2)).ToString("0000000000000000");
+                                string Bittext = Validation.Val(Convert.ToString(Convert.ToInt32(hexStr, 16), 2)).ToString("0000000000000000");
 
-                            if (Bittext.Substring(0, 1) == "1")
-                            {
-                                num -= 65536;
-                            }
+                                if (Bittext.Substring(0, 1) == "1")
+                                {
+                                    num -= 65536;
+                                }
 
-                            switch (ii)
-                            {
-                                case 0:
-                                    //U/D
-                                    DispValue[(int)ANGLE.UD] = ((decimal)num / DispDecimal[0]);
-                                    retUD = (double)DispValue[(int)ANGLE.UD];
-                                    break;
+                                switch (ii)
+                                {
+                                    case 0:
+                                        //U/D
+                                        DispValue[(int)ANGLE.UD] = ((decimal)num / DispDecimal[0]);
+                                        retUD = (double)DispValue[(int)ANGLE.UD];
+                                        break;
 
-                                case 10:
-                                    //L/R
-                                    DispValue[(int)ANGLE.LR] = ((decimal)num / DispDecimal[0]);
-                                    retLR = (double)DispValue[(int)ANGLE.LR];
-                                    break;
+                                    case 10:
+                                        //L/R
+                                        DispValue[(int)ANGLE.LR] = ((decimal)num / DispDecimal[0]);
+                                        retLR = (double)DispValue[(int)ANGLE.LR];
+                                        break;
+                                }
                             }
                         }
                     }
                 }
+                return true; 
+                #endregion
+
             }
-            #endregion
+            catch
+            { return false; }
+            finally
+            { GC.Collect(); }
         }
         #endregion
     }
